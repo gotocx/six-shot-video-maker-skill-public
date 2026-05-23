@@ -4,11 +4,14 @@ import path from 'path';
 import process from 'process';
 
 const LIMITS = {
-  sceneCount: 6,
+  fullSceneCount: 6,
+  quickSceneCount: 1,
   imagePromptChars: 100,
   videoPromptChars: 2000,
-  totalDurationSec: 15,
+  fullDurationSec: 15,
+  quickDurationSec: 4,
   durationTolerance: 0.01,
+  workflowModes: new Set(['full', 'quick']),
   imageModes: new Set(['gpt', 'jimeng', 'browser']),
   minImageBytes: 50 * 1024,
   minWidth: 512,
@@ -44,6 +47,19 @@ function normalizeImageMode(value) {
   return mode || 'gpt';
 }
 
+function normalizeWorkflowMode(value) {
+  const mode = String(value || 'full').trim().toLowerCase();
+  return mode || 'full';
+}
+
+function expectedSceneCount(workflowMode) {
+  return workflowMode === 'quick' ? LIMITS.quickSceneCount : LIMITS.fullSceneCount;
+}
+
+function expectedDurationSec(workflowMode) {
+  return workflowMode === 'quick' ? LIMITS.quickDurationSec : LIMITS.fullDurationSec;
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -57,7 +73,7 @@ function pass(message, detail = {}) {
 }
 
 function readJson(file) {
-  return JSON.parse(fs.readFileSync(file, 'utf8'));
+  return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
 }
 
 function writeJson(file, value) {
@@ -143,6 +159,12 @@ function validateStoryboard(runDir) {
   const data = loaded.data;
   const errors = [];
   const warnings = [];
+  const workflowMode = normalizeWorkflowMode(data.workflowMode);
+  if (!LIMITS.workflowModes.has(workflowMode)) {
+    errors.push('workflowMode must be full or quick');
+  }
+  const sceneCount = expectedSceneCount(workflowMode);
+  const expectedDuration = expectedDurationSec(workflowMode);
   const imageMode = normalizeImageMode(data.imageMode);
   if (!LIMITS.imageModes.has(imageMode)) {
     errors.push('imageMode must be gpt or jimeng');
@@ -152,8 +174,8 @@ function validateStoryboard(runDir) {
   }
   if (!Array.isArray(data.scenes)) {
     errors.push('scenes must be an array');
-  } else if (data.scenes.length !== LIMITS.sceneCount) {
-    errors.push(`scenes must contain exactly ${LIMITS.sceneCount} items`);
+  } else if (data.scenes.length !== sceneCount) {
+    errors.push(`scenes must contain exactly ${sceneCount} item(s) for ${workflowMode} mode`);
   }
 
   const seenIds = new Set();
@@ -188,16 +210,16 @@ function validateStoryboard(runDir) {
     sceneReports.push(report);
   }
 
-  if (Number(data.totalDurationSec) !== LIMITS.totalDurationSec) {
-    errors.push(`totalDurationSec must be ${LIMITS.totalDurationSec}`);
+  if (Number(data.totalDurationSec) !== expectedDuration) {
+    errors.push(`totalDurationSec must be ${expectedDuration} for ${workflowMode} mode`);
   }
-  if (Math.abs(durationSum - LIMITS.totalDurationSec) > LIMITS.durationTolerance) {
-    errors.push(`scene duration sum is ${durationSum}, expected ${LIMITS.totalDurationSec}`);
+  if (Math.abs(durationSum - expectedDuration) > LIMITS.durationTolerance) {
+    errors.push(`scene duration sum is ${durationSum}, expected ${expectedDuration}`);
   }
 
   const result = errors.length
-    ? fail('storyboard validation failed', { errors, warnings, imageMode, scenes: sceneReports })
-    : pass('storyboard validation passed', { warnings, imageMode, scenes: sceneReports });
+    ? fail('storyboard validation failed', { errors, warnings, workflowMode, imageMode, scenes: sceneReports })
+    : pass('storyboard validation passed', { warnings, workflowMode, imageMode, scenes: sceneReports });
   return recordCheck(runDir, 'storyboard', result);
 }
 
@@ -319,13 +341,16 @@ function validateVideoPrompt(runDir) {
   }
   const prompt = fs.readFileSync(promptFile, 'utf8').trim();
   const length = charLen(prompt);
+  const storyboard = loadStoryboard(runDir);
+  const workflowMode = storyboard.data ? normalizeWorkflowMode(storyboard.data.workflowMode) : 'full';
+  const expectedDuration = expectedDurationSec(workflowMode);
   const errors = [];
   if (!prompt) errors.push('video prompt is empty');
   if (length >= LIMITS.videoPromptChars) {
     errors.push(`video prompt has ${length} chars, must be less than ${LIMITS.videoPromptChars}`);
   }
-  if (!/\b15\b|十五/.test(prompt)) {
-    errors.push('video prompt should state total duration around 15 seconds');
+  if (!new RegExp(`\\b${expectedDuration}\\b`).test(prompt)) {
+    errors.push(`video prompt should state total duration around ${expectedDuration} seconds`);
   }
 
   const result = errors.length
@@ -342,7 +367,7 @@ function validateReady(runDir) {
   if (!videoOk) errors.push('video check is not passing');
   const result = errors.length
     ? fail('run is not ready for submit', { errors })
-    : pass('run is ready for six-image video submit');
+    : pass('run is ready for video submit');
   return recordCheck(runDir, 'ready', result);
 }
 
