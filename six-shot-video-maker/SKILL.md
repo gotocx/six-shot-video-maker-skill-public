@@ -1,7 +1,7 @@
 ---
 name: six-shot-video-maker
 description: 将一句视频创作需求落地为完整六图15秒流程或显式快速一图4秒流程、gpt 或 jimeng 生图、图片完整度校验、最终视频提示词和视频提交。Use when the user asks for a 15 second six-shot film, quick 4 second one-image video, storyboard images, connected video prompt, or local browser video submission workflow.
-version: 1.4.0
+version: 1.4.1
 ---
 
 # Six Shot Video Maker
@@ -10,7 +10,7 @@ version: 1.4.0
 <!-- @目的: 用一句创作需求稳定产出六张分镜图和一个总时长约 15 秒的视频提交任务，或显式快速一图 4 秒任务 -->
 
 > **一句话**: 默认拆成 6 张连续分镜图并提交 15 秒视频；用户明确要求快速模式时只生成 1 张关键图并提交 4 秒视频。图片必须先生成并验收，视频提示词必须最后写且少于 2000 字。
-> **版本**: v1.4.0
+> **版本**: v1.4.1
 > **资源原则**: skill 仓库包含状态、校验、生图提交和视频提交入口；运行产物、图片、视频、日志和浏览器 profile 永远放在 skill 包外。
 
 ## 触发示例
@@ -29,7 +29,8 @@ version: 1.4.0
 - `scripts\submit_video.mjs`: 读取已验收图片和 `video_prompt.txt`，用内置视频脚本一次性提交。
 - `scripts\video_submit.mjs`: 视频页面提交 worker，支持多图一次上传、模型和时长状态初始化。
 - `scripts\image_workflow\`: 内置浏览器生图 worker、即梦生图 worker 和共享提示词规范。
-- `scripts\package.json`: 运行依赖声明。首次拉取后如 `preflight` 提示缺依赖，运行 `npm install --prefix <skill>\scripts`。
+- `scripts\install_deps.mjs`: 将运行依赖安装到 skill 目录外的 `.six-shot-runtime`，避免校验工具扫描第三方依赖。
+- `scripts\package.json`: 运行依赖声明。首次拉取后如 `preflight` 提示缺依赖，运行 `node scripts\install_deps.mjs`。
 
 ## @工作流: 六图短片制作
 
@@ -131,6 +132,7 @@ node scripts\asset_state.mjs init --run "E:\648\26-3\统计数据\six-shot-video
 <!-- @ID: step-images -->
 
 - @动作: 生图前运行 `preflight`，确认浏览器、profile、内置 worker 和依赖可用。
+- @动作: 首次拉取仓库后先运行 `node scripts\install_deps.mjs`；它会把依赖安装到 skill 包外的 `.six-shot-runtime`，不要在 `scripts\` 内直接安装依赖。
 - @动作: `submit_images.mjs` 会读取 `storyboard.json`，把任务写到 `checks\gpt-image-queue.json` 或 `checks\jimeng-image-manifest.json`，再顺序提交。
 - @动作: 完整模式严格按 6 条 `imagePrompt` 顺序生成，保存到 `images\scene01.*` 至 `images\scene06.*`；快速模式只生成 `images\scene01.*`。
 - @动作: 不并行生成，不并行占用同一浏览器 profile，不在同一 workspace 启动多个任务。
@@ -138,6 +140,7 @@ node scripts\asset_state.mjs init --run "E:\648\26-3\统计数据\six-shot-video
 - @动作: 只有目标图片都通过完整度和画风检查后，才进入视频提示词阶段。
 
 ```powershell
+node scripts\install_deps.mjs
 node scripts\preflight.mjs --run "<run-dir>"
 node scripts\submit_images.mjs --run "<run-dir>"
 ```
@@ -147,6 +150,7 @@ node scripts\submit_images.mjs --run "<run-dir>"
 - `--image-mode gpt` 或 `--image-mode jimeng`: 覆盖 `storyboard.json` 中的生图模式。
 - `--browser <path>` / `--profile <dir>`: 指定浏览器和本地登录态目录。
 - `SIX_SHOT_BROWSER` / `SIX_SHOT_PROFILE`: 用环境变量复用本机固定路径。
+- `SIX_SHOT_RUNTIME`: 使用非默认依赖运行时目录时设置；默认在 skill 父目录下的 `.six-shot-runtime`。
 - `--force`: 已有图片也重新生成。
 - `--dry-run`: 只生成队列并打印命令，不启动浏览器。
 
@@ -207,8 +211,8 @@ node scripts\submit_video.mjs --run "<run-dir>"
 
 ## 版本历史
 
+- **v1.4.1** (2026-05-24) - 新增外部运行时依赖安装入口，安装依赖后仍保持 skill 目录可被校验工具干净扫描。
 - **v1.4.0** (2026-05-24) - 将生图提交、双模式 worker、视频提交和预检入口收进 skill 资源层，拉取仓库后可通过本机浏览器 profile 复用状态运行。
 - **v1.3.0** (2026-05-24) - 新增显式快速模式：只生成 1 张关键图，查看图片后写单图驱动视频提示词并提交 4 秒视频。
 - **v1.2.0** (2026-05-24) - 明确 `gpt` 与 `jimeng` 双模式选择；补充视频模型和 15 秒时长的页面状态初始化与提交前校验规则。
 - **v1.1.0** (2026-05-24) - 新增双模式图片生成，移除特化触发示例，保留资产状态和顺序校验。
-- **v1.0.0** (2026-05-23) - 初始版本：建立六图分镜、资产状态、图片完整度、视频提示词长度和六图提交流程。

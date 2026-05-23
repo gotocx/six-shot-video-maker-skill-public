@@ -2,13 +2,15 @@ import { spawnSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import puppeteer from 'puppeteer-core';
-import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { buildJimengPrompt, normalizeText } from './jimengPromptBuilder.mjs';
 import { buildUnifiedPrompt, normalizeUnifiedTask } from '../../shared/unifiedTask.mjs';
 
 const HOME_URL_BASE = 'https://jimeng.jianying.com/ai-tool/generate?type=image&workspace=';
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const requireFromHere = createRequire(import.meta.url);
+const puppeteer = await loadPuppeteerCore();
 const PROJECT_ROOT = resolveProjectRoot(SCRIPT_DIR);
 const DEFAULT_QUEUE_DIR = path.join(PROJECT_ROOT, '.auto-image-workflow-data', 'queues');
 const DEFAULT_MANIFEST_FILE = path.join(DEFAULT_QUEUE_DIR, 'image-manifest.json');
@@ -29,6 +31,28 @@ const DEFAULT_MIN_STABLE_DOM_RESULT_COUNT = 1;
 const DEFAULT_PROGRESS_LOG_INTERVAL_MS = 15000;
 const DEFAULT_PRE_SUBMIT_IMAGE_SETTLE_MS = 10000;
 const DEFAULT_PRE_SUBMIT_IMAGE_STABLE_MS = 2500;
+
+function runtimeRoots() {
+  const roots = [];
+  if (process.env.SIX_SHOT_RUNTIME) roots.push(path.resolve(process.env.SIX_SHOT_RUNTIME));
+  if (process.env.SIX_SHOT_NODE_MODULES) roots.push(path.dirname(path.resolve(process.env.SIX_SHOT_NODE_MODULES)));
+  roots.push(path.resolve(SCRIPT_DIR, '..', '..', '..', '..', '..', '..', '.six-shot-runtime'));
+  roots.push(path.resolve(SCRIPT_DIR, '..', '..', '..', '..', 'node_modules', '..'));
+  return [...new Set(roots)];
+}
+
+async function loadPuppeteerCore() {
+  try {
+    return (await import('puppeteer-core')).default;
+  } catch {}
+  for (const root of runtimeRoots()) {
+    try {
+      const entry = requireFromHere.resolve('puppeteer-core', { paths: [root] });
+      return (await import(pathToFileURL(entry).href)).default;
+    } catch {}
+  }
+  throw new Error('Missing puppeteer-core. Run node scripts/install_deps.mjs from the skill folder.');
+}
 const DEFAULT_HISTORY_API_POLL_MS = 10000;
 const DEFAULT_SUBJECT_TAG = '';
 const DEFAULT_PAGE_TIMEOUT_MS = 60 * 1000;

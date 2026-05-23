@@ -14,10 +14,10 @@ Public source for the six-shot video maker skill.
 
 ```powershell
 cd six-shot-video-maker
-npm ci --prefix scripts
+node scripts\install_deps.mjs
 node scripts\preflight.mjs --run "<run-dir>"
 node scripts\submit_images.mjs --run "<run-dir>"
 node scripts\submit_video.mjs --run "<run-dir>"
 ```
 
-Use `SIX_SHOT_BROWSER` and `SIX_SHOT_PROFILE` to point at the local browser executable and logged-in profile when defaults are not correct.
+Use `SIX_SHOT_BROWSER` and `SIX_SHOT_PROFILE` to point at the local browser executable and logged-in profile when defaults are not correct. Runtime dependencies install outside the skill folder by default, so validation tools do not scan third-party packages.

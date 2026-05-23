@@ -53,6 +53,10 @@ function defaultProfile() {
   ]);
 }
 
+function defaultRuntimeDir() {
+  return path.resolve(SCRIPT_DIR, '..', '..', '.six-shot-runtime');
+}
+
 function normalizeImageMode(value) {
   const mode = String(value || 'gpt').trim().toLowerCase();
   return mode === 'browser' ? 'gpt' : mode || 'gpt';
@@ -75,9 +79,11 @@ function buildReport(opts) {
   const imageMode = loadRunMode(runDir, opts.mode || opts['image-mode']);
   const browser = opts.browser || defaultBrowser();
   const profile = opts.profile || defaultProfile();
-  const dependencies = path.join(SCRIPT_DIR, 'node_modules', 'puppeteer-core', 'package.json');
+  const runtimeDir = path.resolve(opts.runtime || process.env.SIX_SHOT_RUNTIME || defaultRuntimeDir());
+  const dependencies = path.join(runtimeDir, 'node_modules', 'puppeteer-core', 'package.json');
   const checks = [
     item('runtime package', path.join(SCRIPT_DIR, 'package.json')),
+    item('runtime lock', path.join(SCRIPT_DIR, 'package-lock.json')),
     item('runtime dependency', dependencies),
     item('browser', browser),
     item('browser profile', profile),
@@ -98,7 +104,7 @@ function buildReport(opts) {
     ok: missing.length === 0,
     imageMode,
     runDir,
-    installHint: exists(dependencies) ? '' : `npm install --prefix "${SCRIPT_DIR}"`,
+    installHint: exists(dependencies) ? '' : `node "${path.join(SCRIPT_DIR, 'install_deps.mjs')}"`,
     checks,
     missing: missing.map(check => check.name),
   };

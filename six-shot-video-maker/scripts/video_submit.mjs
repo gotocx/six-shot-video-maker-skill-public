@@ -5,7 +5,12 @@
 //   node jimengVideoSubmit.mjs --image <p1> --image <p2> ... --prompt <text> [--duration 8] [--model "Seedance 2.0 VIP"]
 import fs from 'fs';
 import path from 'path';
-import puppeteer from 'puppeteer-core';
+import { createRequire } from 'module';
+import { fileURLToPath, pathToFileURL } from 'url';
+
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const requireFromHere = createRequire(import.meta.url);
+const puppeteer = await loadPuppeteerCore();
 
 // ======================== 配置 ========================
 const VIDEO_URLS = [
@@ -15,6 +20,28 @@ const VIDEO_URLS = [
 ];
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function runtimeRoots() {
+  const roots = [];
+  if (process.env.SIX_SHOT_RUNTIME) roots.push(path.resolve(process.env.SIX_SHOT_RUNTIME));
+  if (process.env.SIX_SHOT_NODE_MODULES) roots.push(path.dirname(path.resolve(process.env.SIX_SHOT_NODE_MODULES)));
+  roots.push(path.resolve(SCRIPT_DIR, '..', '..', '.six-shot-runtime'));
+  roots.push(path.resolve(SCRIPT_DIR, 'node_modules', '..'));
+  return [...new Set(roots)];
+}
+
+async function loadPuppeteerCore() {
+  try {
+    return (await import('puppeteer-core')).default;
+  } catch {}
+  for (const root of runtimeRoots()) {
+    try {
+      const entry = requireFromHere.resolve('puppeteer-core', { paths: [root] });
+      return (await import(pathToFileURL(entry).href)).default;
+    } catch {}
+  }
+  throw new Error('Missing puppeteer-core. Run node scripts/install_deps.mjs from the skill folder.');
+}
 
 // ======================== 参数解析 ========================
 function parseArgs() {

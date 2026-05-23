@@ -81,6 +81,7 @@ def validate(skill_dir: Path) -> int:
 
     required_files = [
         skill_dir / "scripts" / "asset_state.mjs",
+        skill_dir / "scripts" / "install_deps.mjs",
         skill_dir / "scripts" / "preflight.mjs",
         skill_dir / "scripts" / "submit_images.mjs",
         skill_dir / "scripts" / "submit_video.mjs",

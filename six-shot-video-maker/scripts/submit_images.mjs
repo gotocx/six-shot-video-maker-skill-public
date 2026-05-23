@@ -73,6 +73,10 @@ function resolveProfile(explicit) {
   return profile;
 }
 
+function defaultRuntimeDir() {
+  return path.resolve(SCRIPT_DIR, '..', '..', '.six-shot-runtime');
+}
+
 function runChecked(args, options = {}) {
   const result = spawnSync(args[0], args.slice(1), { stdio: options.stdio || 'inherit', encoding: 'utf8' });
   if (result.error) throw result.error;
@@ -162,7 +166,11 @@ function runWorker(workerPath, args, dryRun, runDir) {
     const result = spawnSync(command[0], command.slice(1), {
       stdio: 'inherit',
       encoding: 'utf8',
-      env: { ...process.env, AUTO_IMAGE_PROJECT_ROOT: runDir },
+      env: {
+        ...process.env,
+        AUTO_IMAGE_PROJECT_ROOT: runDir,
+        SIX_SHOT_RUNTIME: process.env.SIX_SHOT_RUNTIME || defaultRuntimeDir(),
+      },
     });
     if (result.error) throw result.error;
     if (result.status !== 0) throw new Error(`${command[0]} exited with ${result.status}`);

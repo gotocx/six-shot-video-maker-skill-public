@@ -36,6 +36,7 @@ function runChecked(args, options = {}) {
     cwd: options.cwd || process.cwd(),
     stdio: options.stdio || 'pipe',
     encoding: 'utf8',
+    env: options.env || process.env,
   });
   if (result.error) throw result.error;
   if (options.logFile) {
@@ -47,6 +48,10 @@ function runChecked(args, options = {}) {
   }
   if (result.status !== 0) throw new Error(`${args[0]} exited with ${result.status}`);
   return result;
+}
+
+function defaultRuntimeDir() {
+  return path.resolve(SCRIPT_DIR, '..', '..', '.six-shot-runtime');
 }
 
 function validateStage(runDir, stage) {
@@ -92,7 +97,11 @@ function main() {
 
   const logFile = path.join(runDir, 'logs', 'video_submit.log');
   console.log(`[video] submitting ${images.length} image(s), duration ${duration}s, model ${model}`);
-  runChecked(args, { cwd: SCRIPT_DIR, logFile });
+  runChecked(args, {
+    cwd: SCRIPT_DIR,
+    logFile,
+    env: { ...process.env, SIX_SHOT_RUNTIME: process.env.SIX_SHOT_RUNTIME || defaultRuntimeDir() },
+  });
   runChecked([process.execPath, ASSET_SCRIPT, 'mark', '--run', runDir, '--stage', 'video_submit', '--status', 'submitted'], { stdio: 'inherit' });
   console.log(`[video] log: ${logFile}`);
 }

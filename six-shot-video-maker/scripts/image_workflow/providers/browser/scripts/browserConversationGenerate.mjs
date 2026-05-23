@@ -3,16 +3,18 @@ import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import puppeteer from 'puppeteer-core';
-import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { buildUnifiedPrompt, normalizeUnifiedTask } from '../../shared/unifiedTask.mjs';
 
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const requireFromHere = createRequire(import.meta.url);
+const puppeteer = await loadPuppeteerCore();
 const DEFAULT_LOGIN_TIMEOUT_MS = 15 * 60 * 1000;
 const DEFAULT_RESULT_TIMEOUT_MS = 15 * 60 * 1000;
 const DEFAULT_STABLE_WAIT_MS = 12000;
 const DEFAULT_POLL_MS = 4000;
 const DEFAULT_MIN_IMAGE_BYTES = 20 * 1024;
-const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const TARGET_SITE_HOST = String(process.env.IMAGE_SITE_HOST || ['chat', 'g', 'pt.com'].join(''))
   .trim()
   .replace(/^https?:\/\//i, '')
@@ -21,6 +23,28 @@ const TARGET_SITE_ORIGIN = `https://${TARGET_SITE_HOST}`;
 const DEFAULT_WORK_ROOT = resolveProjectRoot(SCRIPT_DIR, '.auto-image-workflow-data');
 const DEFAULT_OUT_DIR = path.join(DEFAULT_WORK_ROOT, 'output', 'browser');
 const DEFAULT_LOG_DIR = path.join(DEFAULT_WORK_ROOT, 'logs', 'browser');
+
+function runtimeRoots() {
+  const roots = [];
+  if (process.env.SIX_SHOT_RUNTIME) roots.push(path.resolve(process.env.SIX_SHOT_RUNTIME));
+  if (process.env.SIX_SHOT_NODE_MODULES) roots.push(path.dirname(path.resolve(process.env.SIX_SHOT_NODE_MODULES)));
+  roots.push(path.resolve(SCRIPT_DIR, '..', '..', '..', '..', '..', '..', '.six-shot-runtime'));
+  roots.push(path.resolve(SCRIPT_DIR, '..', '..', '..', '..', 'node_modules', '..'));
+  return [...new Set(roots)];
+}
+
+async function loadPuppeteerCore() {
+  try {
+    return (await import('puppeteer-core')).default;
+  } catch {}
+  for (const root of runtimeRoots()) {
+    try {
+      const entry = requireFromHere.resolve('puppeteer-core', { paths: [root] });
+      return (await import(pathToFileURL(entry).href)).default;
+    } catch {}
+  }
+  throw new Error('Missing puppeteer-core. Run node scripts/install_deps.mjs from the skill folder.');
+}
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
