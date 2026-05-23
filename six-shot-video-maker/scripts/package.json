@@ -1,0 +1,8 @@
+{
+  "name": "six-shot-video-maker-runtime",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "puppeteer-core": "^24.42.0"
+  }
+}

@@ -27,8 +27,14 @@ def forbidden_terms() -> list[str]:
 
 def iter_files(skill_dir: Path):
     for path in skill_dir.rglob("*"):
+        if "node_modules" in path.parts:
+            continue
         if path.is_file():
             yield path
+
+
+def rel(path: Path, root: Path) -> str:
+    return str(path.relative_to(root))
 
 
 def validate(skill_dir: Path) -> int:
@@ -78,16 +84,33 @@ def validate(skill_dir: Path) -> int:
     if assets_dir.exists() and any(assets_dir.rglob("*")):
         errors.append("assets directory must stay empty; run assets belong outside the skill package")
 
-    asset_script = skill_dir / "scripts" / "asset_state.mjs"
-    if not asset_script.exists():
-        errors.append("Missing scripts/asset_state.mjs")
-    else:
+    required_files = [
+        skill_dir / "scripts" / "asset_state.mjs",
+        skill_dir / "scripts" / "preflight.mjs",
+        skill_dir / "scripts" / "submit_images.mjs",
+        skill_dir / "scripts" / "submit_video.mjs",
+        skill_dir / "scripts" / "video_submit.mjs",
+        skill_dir / "scripts" / "package.json",
+        skill_dir / "scripts" / "package-lock.json",
+        skill_dir / "scripts" / "image_workflow" / "run-browser-worker.ps1",
+        skill_dir / "scripts" / "image_workflow" / "run-jimeng-worker.ps1",
+        skill_dir / "scripts" / "image_workflow" / "providers" / "browser" / "scripts" / "browserConversationGenerate.mjs",
+        skill_dir / "scripts" / "image_workflow" / "providers" / "jimeng" / "scripts" / "jimengBatchGenerate.mjs",
+        skill_dir / "scripts" / "image_workflow" / "providers" / "shared" / "unifiedTask.mjs",
+    ]
+    for required in required_files:
+        if not required.exists():
+            errors.append(f"Missing {rel(required, skill_dir)}")
+
+    mjs_files = sorted((skill_dir / "scripts").rglob("*.mjs"))
+    for script in mjs_files:
         try:
-            subprocess.run(["node", "--check", str(asset_script)], check=True, capture_output=True, text=True)
+            subprocess.run(["node", "--check", str(script)], check=True, capture_output=True, text=True)
         except FileNotFoundError:
             errors.append("node was not found for script syntax check")
+            break
         except subprocess.CalledProcessError as exc:
-            errors.append("asset_state.mjs syntax check failed: " + (exc.stderr or exc.stdout).strip())
+            errors.append(f"{rel(script, skill_dir)} syntax check failed: " + (exc.stderr or exc.stdout).strip())
 
     if errors:
         for message in errors:
