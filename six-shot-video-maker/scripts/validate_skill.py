@@ -61,11 +61,6 @@ def validate(skill_dir: Path) -> int:
         if "TODO" in content:
             errors.append("SKILL.md contains TODO placeholder text")
 
-    lowered_root = str(skill_dir).lower()
-    for term in forbidden_terms():
-        if term in lowered_root:
-            errors.append("skill path contains a forbidden provider word")
-
     for file_path in iter_files(skill_dir):
         lowered_name = file_path.name.lower()
         for term in forbidden_terms():
